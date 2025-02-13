@@ -1,3 +1,12 @@
+    python3 -m venv venv
+    . ./venv/bin/activate
+    pip3 install .
+    cd src
+    python3 client.py
+
+
+
+
 
 ```
 curl -k "https://127.0.0.1:5005/wallet_provider?entity_id=https://openidfed-dev-1.sunet.se:5001"
