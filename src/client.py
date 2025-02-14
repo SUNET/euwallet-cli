@@ -3,13 +3,16 @@ from idpyoidc.message import Message
 
 import pdb
 from fedservice.utils import make_federation_combo
+from fedservice.entity import get_verified_trust_chains
 import json
 import pprint
 from cryptojwt import JWT
 from cryptojwt.utils import b64e
-
+from idpyoidc import verified_claim_name
 from idpyoidc.client.defaults import CC_METHOD
 from idpyoidc.util import rndstr
+from idpyoidc.key_import import store_under_other_id
+from idpyoidc.key_import import import_jwks
 
 from urllib.parse import urlparse, parse_qsl
 
@@ -225,10 +228,102 @@ print(f"Redirect to: {req_info['url']}")
 url = input("Enter url you got back please:")
 issuer_string = urlparse(url).path.split("/authz_cb/")[1]
 
-pdb.set_trace()
+
+print("== Getting token ==")
 _consumer = get_consumer(issuer_string)
 _consumer.finalize_auth(dict(parse_qsl(urlparse(url).query)))
-response = urlparse(url).query.to_dict()
+response = urlparse(url).query
 print(response)
 
+_wia_flow = app["wallet"].context.wia_flow[ephemeral_key.kid]
+
+_req_args = _consumer.context.cstate.get_set(
+    _wia_flow["state"], claim=["redirect_uri", "code", "nonce"]
+)
+
+_args = {
+    "audience": _consumer.context.issuer,
+    "thumbprint": ephemeral_key.kid,
+    "wallet_instance_attestation": _wia_flow["wallet_instance_attestation"][
+        "assertion"
+    ],
+    "signing_key": wallet_entity.get_ephemeral_key(ephemeral_key.kid),
+}
+_nonce = _req_args.get("nonce", "")
+if _nonce:
+    _args["nonce"] = _nonce
+_lifetime = _consumer.context.config["conf"].get("jwt_lifetime")
+if _lifetime:
+    _args["lifetime"] = _lifetime
+
+_request_args = {
+    "code": _req_args["code"],
+    "grant_type": "authorization_code",
+    "redirect_uri": _req_args["redirect_uri"],
+    "state": _wia_flow["state"],
+}
+
+# Just for display purposes
+_service = _consumer.get_service("accesstoken")
+_metadata = app["federation_entity"].get_verified_metadata(_consumer.context.issuer)
+_args["endpoint"] = _metadata["oauth_authorization_server"]["token_endpoint"]
+req_info = _service.get_request_parameters(_request_args, **_args)
+
+# Real request
+resp = _consumer.do_request(
+    "accesstoken", request_args=_request_args, state=_wia_flow["state"], **_args
+)
+pprint.pp(resp.to_dict())
+del req_info["request"]
+print("== Getting credential ==")
+
+trust_chains = get_verified_trust_chains(_consumer, _consumer.context.issuer)
+trust_chain = trust_chains[0]
+wallet_entity = app["wallet"]
+wallet_entity.keyjar = import_jwks(
+    wallet_entity.keyjar,
+    trust_chain.metadata["openid_credential_issuer"]["jwks"],
+    _consumer.context.issuer,
+)
+
+# consumer.context.keyjar = wallet_entity.keyjar
+_consumer.keyjar = wallet_entity.keyjar
+_wia_flow = wallet_entity.context.wia_flow[ephemeral_key.kid]
+
+_req_args = _consumer.context.cstate.get_set(_wia_flow["state"], claim=["access_token"])
+
+_request_args = {"format": "vc+sd-jwt"}
+
+_service = _consumer.get_service("credential")
+req_info = _service.get_request_parameters(
+    _request_args, access_token=_req_args["access_token"], state=_wia_flow["state"]
+)
+
+# Issuer Fix
+if "https://127.0.0.1:8080" in _consumer.keyjar:
+    _consumer.keyjar = store_under_other_id(
+        _consumer.keyjar,
+        fro="https://127.0.0.1:8080",
+        to="https://vc-interop-1.sunet.se",
+    )
+if "https://satosa-test-1.sunet.se" in _consumer.keyjar:
+    _consumer.keyjar = store_under_other_id(
+        _consumer.keyjar,
+        fro="https://satosa-test-1.sunet.se",
+        to="https://vc-interop-1.sunet.se",
+    )
+
+print(f"vc-interop-1.sunet.se keys: {_consumer.keyjar.export_jwks_as_json(
+    issuer_id='https://vc-interop-1.sunet.se')}")
+
+resp = _consumer.do_request(
+    "credential",
+    request_args=_request_args,
+    access_token=_req_args["access_token"],
+    state=_wia_flow["state"],
+    endpoint=trust_chain.metadata["openid_credential_issuer"]["credential_endpoint"],
+)
+
+print(f"Signed JWT: {pprint.pp(resp['credentials'])} \n verified_claim: {
+      pprint.pp(resp[verified_claim_name('credential')])}")
 # pdb.set_trace()
