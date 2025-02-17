@@ -1,20 +1,22 @@
-from openid4v.message import WalletInstanceAttestationJWT
-from idpyoidc.message import Message
-
+from bs4 import BeautifulSoup
+import requests
 import pdb
-from fedservice.utils import make_federation_combo
-from fedservice.entity import get_verified_trust_chains
-import json
-import pprint
 from cryptojwt import JWT
 from cryptojwt.utils import b64e
+from fedservice.entity import get_verified_trust_chains
+from fedservice.utils import make_federation_combo
 from idpyoidc import verified_claim_name
 from idpyoidc.client.defaults import CC_METHOD
+from idpyoidc.key_import import import_jwks, store_under_other_id
+from idpyoidc.message import Message
 from idpyoidc.util import rndstr
-from idpyoidc.key_import import store_under_other_id
-from idpyoidc.key_import import import_jwks
-
+from openid4v.message import WalletInstanceAttestationJWT
 from urllib.parse import urlparse, parse_qsl
+import json
+import pprint
+import urllib3
+
+urllib3.disable_warnings()
 
 wallet_provider = "https://openidfed-test-1.sunet.se:5001"
 ephemeral_key = None
@@ -99,15 +101,10 @@ def find_issuers_of_trustmark(credential_issuers, credential_type):
                         cred_issuer_to_use.append(eid)
                 else:
                     print("Could not verify trust mark")
-
     return cred_issuer_to_use
 
 
-# main():
-# getopt
-# param EID
 cnf = json.loads(open("client.conf", "r").read())
-
 app = make_federation_combo(**cnf["entity"])
 app.federation_entity = app["federation_entity"]
 trust_anchor = app.federation_entity.function.trust_chain_collector.trust_anchors
@@ -206,7 +203,8 @@ kwargs = {
 }
 
 if "pushed_authorization" in actor.context.add_on:
-    _metadata = app["federation_entity"].get_verified_metadata(actor.context.issuer)
+    _metadata = app["federation_entity"].get_verified_metadata(
+        actor.context.issuer)
     if (
         "pushed_authorization_request_endpoint"
         in _metadata["oauth_authorization_server"]
@@ -221,13 +219,25 @@ _service = actor.get_service("authorization")
 _service.certificate_issuer_id = cred_issuer_to_use
 
 req_info = _service.get_request_parameters(request_args, **kwargs)
-
+print("== Following SAML2 flow ==")
 auth_req_uri = req_info["url"]
 print(f"Redirect to: {req_info['url']}")
-
-url = input("Enter url you got back please:")
+session = requests.session()
+resp = session.get(req_info["url"])
+form = BeautifulSoup(resp.content, features="html.parser").find_all("form")[1]
+form_payload = {}
+for input in form.find_all("input"):
+    form_payload[input.get("name")] = "theron"
+resp = session.post(form.get("action"), data=form_payload)
+form = BeautifulSoup(resp.content, features="html.parser").find("form")
+form_payload = {}
+for input in form.find_all("input"):
+    form_payload[input.get("name")] = input.get("value", "")
+resp = session.post(form.get("action"), data=form_payload,
+                    allow_redirects=False)
+assert resp.is_redirect
+url = resp.text
 issuer_string = urlparse(url).path.split("/authz_cb/")[1]
-
 
 print("== Getting token ==")
 _consumer = get_consumer(issuer_string)
@@ -265,7 +275,8 @@ _request_args = {
 
 # Just for display purposes
 _service = _consumer.get_service("accesstoken")
-_metadata = app["federation_entity"].get_verified_metadata(_consumer.context.issuer)
+_metadata = app["federation_entity"].get_verified_metadata(
+    _consumer.context.issuer)
 _args["endpoint"] = _metadata["oauth_authorization_server"]["token_endpoint"]
 req_info = _service.get_request_parameters(_request_args, **_args)
 
@@ -290,7 +301,8 @@ wallet_entity.keyjar = import_jwks(
 _consumer.keyjar = wallet_entity.keyjar
 _wia_flow = wallet_entity.context.wia_flow[ephemeral_key.kid]
 
-_req_args = _consumer.context.cstate.get_set(_wia_flow["state"], claim=["access_token"])
+_req_args = _consumer.context.cstate.get_set(
+    _wia_flow["state"], claim=["access_token"])
 
 _request_args = {"format": "vc+sd-jwt"}
 
