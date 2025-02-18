@@ -1,6 +1,10 @@
-from bs4 import BeautifulSoup
+import json
+import pprint
+from urllib.parse import parse_qsl, urlparse
+
 import requests
-import pdb
+import urllib3
+from bs4 import BeautifulSoup
 from cryptojwt import JWT
 from cryptojwt.utils import b64e
 from fedservice.entity import get_verified_trust_chains
@@ -11,10 +15,6 @@ from idpyoidc.key_import import import_jwks, store_under_other_id
 from idpyoidc.message import Message
 from idpyoidc.util import rndstr
 from openid4v.message import WalletInstanceAttestationJWT
-from urllib.parse import urlparse, parse_qsl
-import json
-import pprint
-import urllib3
 
 urllib3.disable_warnings()
 
@@ -53,8 +53,7 @@ def find_credential_issuers():
             continue
         if "openid_credential_issuer" in _metadata:
             res.append(entity_id)
-        print(f"Trawling beneath '{
-            entity_id}' looking for '{entity_type}'")
+        print(f"Trawling beneath '{entity_id}' looking for '{entity_type}'")
         _subs = app["federation_entity"].trawl(
             ta_id, entity_id, entity_type=entity_type
         )
@@ -113,9 +112,9 @@ print(pprint.pp(trust_anchor))
 
 print("== Getting Wallet Instance Attestation ==")
 ephemeral_key = app["wallet"].mint_new_key()
-app["wallet"].context.wia_flow[ephemeral_key.kid]["ephemeral_key_tag"] = (
-    ephemeral_key.kid
-)
+app["wallet"].context.wia_flow[ephemeral_key.kid][
+    "ephemeral_key_tag"
+] = ephemeral_key.kid
 _wia_info = app["wallet"].context.wia_flow[ephemeral_key.kid]
 wallet_instance_attestation, war_payload = app[
     "wallet"
@@ -137,7 +136,11 @@ print(f"{wallet_instance_attestation['assertion']}\n unpacked:{_ass}")
 print("== Finding issuers in the federation through TrustMarks ==")
 
 msg = Message().from_dict(
-    {"collect_id": "collect_id_ehic_122", "authentic_source": "EHIC:00001", "document_type": "EHIC"}
+    {
+        "collect_id": "collect_id_ehic_122",
+        "authentic_source": "EHIC:00001",
+        "document_type": "EHIC",
+    }
 )
 credential_type = f"{msg['document_type']}Credential"
 # Remove so not part of issuer state
@@ -203,8 +206,7 @@ kwargs = {
 }
 
 if "pushed_authorization" in actor.context.add_on:
-    _metadata = app["federation_entity"].get_verified_metadata(
-        actor.context.issuer)
+    _metadata = app["federation_entity"].get_verified_metadata(actor.context.issuer)
     if (
         "pushed_authorization_request_endpoint"
         in _metadata["oauth_authorization_server"]
@@ -233,8 +235,7 @@ form = BeautifulSoup(resp.content, features="html.parser").find("form")
 form_payload = {}
 for input in form.find_all("input"):
     form_payload[input.get("name")] = input.get("value", "")
-resp = session.post(form.get("action"), data=form_payload,
-                    allow_redirects=False)
+resp = session.post(form.get("action"), data=form_payload, allow_redirects=False)
 assert resp.is_redirect
 url = resp.text
 issuer_string = urlparse(url).path.split("/authz_cb/")[1]
@@ -275,8 +276,7 @@ _request_args = {
 
 # Just for display purposes
 _service = _consumer.get_service("accesstoken")
-_metadata = app["federation_entity"].get_verified_metadata(
-    _consumer.context.issuer)
+_metadata = app["federation_entity"].get_verified_metadata(_consumer.context.issuer)
 _args["endpoint"] = _metadata["oauth_authorization_server"]["token_endpoint"]
 req_info = _service.get_request_parameters(_request_args, **_args)
 
@@ -301,8 +301,7 @@ wallet_entity.keyjar = import_jwks(
 _consumer.keyjar = wallet_entity.keyjar
 _wia_flow = wallet_entity.context.wia_flow[ephemeral_key.kid]
 
-_req_args = _consumer.context.cstate.get_set(
-    _wia_flow["state"], claim=["access_token"])
+_req_args = _consumer.context.cstate.get_set(_wia_flow["state"], claim=["access_token"])
 
 _request_args = {"format": "vc+sd-jwt"}
 
@@ -325,8 +324,9 @@ if "https://satosa-test-1.sunet.se" in _consumer.keyjar:
         to="https://vc-interop-1.sunet.se",
     )
 
-print(f"vc-interop-1.sunet.se keys: {_consumer.keyjar.export_jwks_as_json(
-    issuer_id='https://vc-interop-1.sunet.se')}")
+print(
+    f"vc-interop-1.sunet.se keys: {_consumer.keyjar.export_jwks_as_json(issuer_id='https://vc-interop-1.sunet.se')}"
+)
 
 resp = _consumer.do_request(
     "credential",
@@ -336,6 +336,8 @@ resp = _consumer.do_request(
     endpoint=trust_chain.metadata["openid_credential_issuer"]["credential_endpoint"],
 )
 
-print(f"Signed JWT: {pprint.pp(resp['credentials'])} \n verified_claim: {
-      pprint.pp(resp[verified_claim_name('credential')])}")
+print(
+    f"Signed JWT: {pprint.pp(resp['credentials'])} \n verified_claim: {
+      pprint.pp(resp[verified_claim_name('credential')])}"
+)
 # pdb.set_trace()
