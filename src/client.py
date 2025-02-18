@@ -18,7 +18,7 @@ import urllib3
 
 urllib3.disable_warnings()
 
-wallet_provider = "https://openidfed-dev-1.sunet.se:5001"
+wallet_provider = "https://openidfed-test-1.sunet.se:5001"
 ephemeral_key = None
 
 
