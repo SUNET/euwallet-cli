@@ -137,7 +137,7 @@ print(f"{wallet_instance_attestation['assertion']}\n unpacked:{_ass}")
 print("== Finding issuers in the federation through TrustMarks ==")
 
 msg = Message().from_dict(
-    {"collect_id": "122", "authentic_source": "EHIC:00001", "document_type": "EHIC"}
+    {"collect_id": "collect_id_ehic_122", "authentic_source": "EHIC:00001", "document_type": "EHIC"}
 )
 credential_type = f"{msg['document_type']}Credential"
 # Remove so not part of issuer state
