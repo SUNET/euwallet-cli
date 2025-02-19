@@ -2,5 +2,5 @@
     . ./venv/bin/activate
     pip3 install .
     cd src
-    python3 client.py
+    ./client.py <client.conf> (e.g client-test.conf)
 

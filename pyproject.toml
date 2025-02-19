@@ -3,7 +3,7 @@ name = "flask-wallet-test-client"
 version = "0.1.0"
 description = "Test client for Flask-based wallet application"
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3"
 
 dependencies = [
 "idpyoidc @ git+https://github.com/IdentityPython/idpy-oidc.git@issuer_metadata",
@@ -11,5 +11,6 @@ dependencies = [
 "openid4v @ git+https://github.com/SUNET/openid4v.git",
 "idpysdjwt @ git+https://github.com/SUNET/idpy-sdjwt.git",
 "requests",
+"typer",
 "bs4"
 ]

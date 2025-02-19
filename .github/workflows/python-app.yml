@@ -38,4 +38,4 @@ jobs:
     - name: Test to run the tool
       run: |
         cd src
-        python3 client.py
+        python3 client.py client-test.conf
