@@ -21,9 +21,8 @@ import typer
 
 urllib3.disable_warnings()
 # Don't have time for a rewrite just now - lets keep app global for now
-app = ""
 
-def get_consumer(issuer):
+def get_consumer(app,issuer):
     actor = app["pid_eaa_consumer"]
     _consumer = None
     for iss in actor.issuers():
@@ -40,7 +39,7 @@ def hash_func(value):
     return b64e(_hv).decode("ascii")
 
 
-def find_credential_issuers():
+def find_credential_issuers(app):
     res = []
     entity_type = "openid_credential_issuer"
     ta_id = list(app["federation_entity"].trust_anchors.keys())[0]
@@ -66,7 +65,7 @@ def find_credential_issuers():
     return res
 
 
-def find_credential_type_issuers(credential_issuers, credential_type):
+def find_credential_type_issuers(app,credential_issuers, credential_type):
     _oci = {}
     # Other possibility = 'PDA1Credential'
     # credential_type = "EHICCredential"
@@ -82,7 +81,7 @@ def find_credential_type_issuers(credential_issuers, credential_type):
     return _oci
 
 
-def find_issuers_of_trustmark(credential_issuers, credential_type):
+def find_issuers_of_trustmark(app,credential_issuers, credential_type):
     cred_issuer_to_use = []
     # tmi = {}
     trustmark_id = f"http://dc4eu.example.com/{credential_type}/se"
@@ -151,16 +150,16 @@ def main(config:str):
 
     issuer_state = msg.to_urlencoded()
     # All credential issuers
-    credential_issuers = find_credential_issuers()
+    credential_issuers = find_credential_issuers(app)
     print(f"Credential Issuers: {credential_issuers}")
 
     # Credential issuers that issue a specific credential type
-    _oci = find_credential_type_issuers(credential_issuers, credential_type)
+    _oci = find_credential_type_issuers(app,credential_issuers, credential_type)
     credential_type_issuers = set(list(_oci.keys()))
     print(f"{credential_type} Issuers: {credential_type_issuers}")
 
     # Credential issuer that has a specific trust mark
-    cred_issuer_to_use = find_issuers_of_trustmark(_oci, credential_type)
+    cred_issuer_to_use = find_issuers_of_trustmark(app,_oci, credential_type)
     print(f"Credential Issuer to use: {cred_issuer_to_use}")
 
     # Picking the first one
@@ -246,7 +245,7 @@ def main(config:str):
     issuer_string = urlparse(url).path.split("/authz_cb/")[1]
 
     print("== Getting token ==")
-    _consumer = get_consumer(issuer_string)
+    _consumer = get_consumer(app,issuer_string)
     _consumer.finalize_auth(dict(parse_qsl(urlparse(url).query)))
     response = urlparse(url).query
     print(response)
