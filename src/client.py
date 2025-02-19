@@ -311,22 +311,31 @@ req_info = _service.get_request_parameters(
     _request_args, access_token=_req_args["access_token"], state=_wia_flow["state"]
 )
 
+vc_instance = "vc-interop-1.sunet.se"
 # Issuer Fix
 if "https://127.0.0.1:8080" in _consumer.keyjar:
     _consumer.keyjar = store_under_other_id(
         _consumer.keyjar,
         fro="https://127.0.0.1:8080",
-        to="https://vc-interop-1.sunet.se",
+        to=f"https://{vc_instance}",
     )
 if "https://satosa-test-1.sunet.se" in _consumer.keyjar:
     _consumer.keyjar = store_under_other_id(
         _consumer.keyjar,
         fro="https://satosa-test-1.sunet.se",
-        to="https://vc-interop-1.sunet.se",
+        to=f"https://{vc_instance}",
     )
 
-print(f"vc-interop-1.sunet.se keys: {_consumer.keyjar.export_jwks_as_json(
-    issuer_id='https://vc-interop-1.sunet.se')}")
+if "https://satosa-dev-1.sunet.se" in _consumer.keyjar:
+    vc_instance = "vc-interop-2.sunet.se"
+    _consumer.keyjar = store_under_other_id(
+        _consumer.keyjar,
+        fro="https://satosa-dev-1.sunet.se",
+        to=f"https://{vc_instance}",
+    )
+
+print(f"{vc_instance} keys: {_consumer.keyjar.export_jwks_as_json(
+    issuer_id="https://{vc_instance}")}")
 
 resp = _consumer.do_request(
     "credential",
