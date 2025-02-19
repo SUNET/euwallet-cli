@@ -20,6 +20,8 @@ import urllib3
 import typer
 
 urllib3.disable_warnings()
+# Don't have time for a rewrite just now - lets keep app global for now
+app = ""
 
 def get_consumer(issuer):
     actor = app["pid_eaa_consumer"]
