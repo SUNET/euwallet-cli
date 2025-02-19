@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 
-import json
+
 import logging
 import pprint
 from urllib.parse import parse_qsl, urlparse
 
+import openid4v
 import requests
 import typer
 import urllib3
@@ -13,12 +14,29 @@ from cryptojwt import JWT
 from cryptojwt.utils import b64e
 from fedservice.entity import get_verified_trust_chains
 from fedservice.utils import make_federation_combo
-from idpyoidc import verified_claim_name
+
+# from idpyoidc import verified_claim_name
 from idpyoidc.client.defaults import CC_METHOD
 from idpyoidc.key_import import import_jwks, store_under_other_id
 from idpyoidc.message import Message
 from idpyoidc.util import rndstr
-from openid4v.message import WalletInstanceAttestationJWT
+
+from utils import SaveLoadManager
+
+"""
+In the code below:
+
+"verifiable credentials" refers to Verifiable Credentials as defined in the 
+W3C Verifiable Credentials Data Model.
+
+"vct" (Verifiable Credentials Type) includes the following credential types:
+
+EHIC Credentials
+PDA1 Credentials
+Person Identification Data (PID)
+
+The current flow has been tested with EHIC Credentials.
+"""
 
 urllib3.disable_warnings()
 
@@ -114,23 +132,32 @@ def find_issuers_of_trustmark(app, credential_issuers, credential_type):
     return cred_issuer_to_use
 
 
-def main(config: str):
+def main(config_path: str):
+
+    print(config_path)
+
     ephemeral_key = None
 
-    cnf = json.loads(open(config, "r").read())
+    cnf = SaveLoadManager.load_config(config_path)
+
     wallet_provider = cnf["wallet_provider"]
+
     app = make_federation_combo(**cnf["entity"])
+
     app.federation_entity = app["federation_entity"]
+
     trust_anchor = app.federation_entity.function.trust_chain_collector.trust_anchors
 
     print(pprint.pp(trust_anchor))
 
     print("== Getting Wallet Instance Attestation ==")
+
     ephemeral_key = app["wallet"].mint_new_key()
     app["wallet"].context.wia_flow[ephemeral_key.kid][
         "ephemeral_key_tag"
     ] = ephemeral_key.kid
     _wia_info = app["wallet"].context.wia_flow[ephemeral_key.kid]
+
     wallet_instance_attestation, war_payload = app[
         "wallet"
     ].request_wallet_instance_attestation(
@@ -141,9 +168,13 @@ def main(config: str):
         hardware_signature="__not__applicable__",
         crypto_hardware_key_tag="__not__applicable__",
     )
+
     _wia_info["wallet_instance_attestation"] = wallet_instance_attestation
+
     _jwt = JWT(key_jar=app["wallet"].keyjar)
-    _jwt.msg_cls = WalletInstanceAttestationJWT
+
+    _jwt.msg_cls = openid4v.message.WalletInstanceAttestationJWT
+
     _ass = _jwt.unpack(token=wallet_instance_attestation["assertion"])
 
     print(f"{wallet_instance_attestation['assertion']}\n unpacked:{_ass}")
@@ -234,9 +265,11 @@ def main(config: str):
     _wia_flow["state"] = kwargs["state"]
 
     _service = actor.get_service("authorization")
+
     _service.certificate_issuer_id = cred_issuer_to_use
 
     req_info = _service.get_request_parameters(request_args, **kwargs)
+
     print("== Following SAML2 flow ==")
 
     print(f"Redirect to: {req_info['url']}")
@@ -244,11 +277,13 @@ def main(config: str):
     resp = session.get(req_info["url"])
     form = BeautifulSoup(resp.content, features="html.parser").find_all("form")[1]
     form_payload = {}
+
     for input in form.find_all("input"):
         form_payload[input.get("name")] = "theron"
     resp = session.post(form.get("action"), data=form_payload)
     form = BeautifulSoup(resp.content, features="html.parser").find("form")
     form_payload = {}
+
     for input in form.find_all("input"):
         form_payload[input.get("name")] = input.get("value", "")
     resp = session.post(form.get("action"), data=form_payload, allow_redirects=False)
@@ -276,6 +311,7 @@ def main(config: str):
         ],
         "signing_key": wallet_entity.get_ephemeral_key(ephemeral_key.kid),
     }
+
     _nonce = _req_args.get("nonce", "")
     if _nonce:
         _args["nonce"] = _nonce
@@ -352,9 +388,7 @@ def main(config: str):
         )
 
     print(
-        f"{vc_instance} keys: {
-            _consumer.keyjar.export_jwks_as_json(issuer_id='https://{vc_instance}')
-        }"
+        f"{vc_instance} keys: {_consumer.keyjar.export_jwks_as_json(issuer_id="https://{vc_instance}")}"
     )
 
     resp = _consumer.do_request(
@@ -367,12 +401,20 @@ def main(config: str):
         ],
     )
 
-    print(
-        f"Signed JWT: {pprint.pp(resp['credentials'])} \n verified_claim: {
-            pprint.pp(resp[verified_claim_name('credential')])
-        }"
+    # print(
+    #     f"Signed JWT: {pprint.pp(resp['credentials'])} \n verified_claim: {
+    #       pprint.pp(resp[openid4v.verified_claim_name('credential')])}"
+    # )
+
+    print(f"{resp.__class__.__module__}.{resp.__class__.__name__}")
+    print(resp)
+    SaveLoadManager.save_received_verifiable_credentials(
+        vars(resp),
+        f"{resp.__class__.__module__}.{resp.__class__.__name__}",
+        cred_issuer_to_use,
     )
 
 
 if __name__ == "__main__":
+
     typer.run(main)
