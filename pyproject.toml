@@ -1,10 +1,9 @@
 [project]
-name = "flask-wallet-test-client"
+name = "euwallet-cli"
 version = "0.1.0"
-description = "Test client for Flask-based wallet application"
+description = "Test client for eu wallet flows"
 readme = "README.md"
-requires-python = ">=3"
-
+requires-python = ">=3.8"
 dependencies = [
 "idpyoidc @ git+https://github.com/IdentityPython/idpy-oidc.git@issuer_metadata",
 "fedservice @ git+https://github.com/SUNET/fedservice.git",
@@ -12,5 +11,14 @@ dependencies = [
 "idpysdjwt @ git+https://github.com/SUNET/idpy-sdjwt.git",
 "requests",
 "typer",
-"bs4"
+"beautifulsoup4"
 ]
+
+[tool.isort]
+multi_line_output = 3
+line_length = 88
+include_trailing_comma = true
+
+[tool.black]
+line_length = 88
+
