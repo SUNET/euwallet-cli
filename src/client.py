@@ -2,7 +2,6 @@
 
 from bs4 import BeautifulSoup
 import requests
-import pdb
 from cryptojwt import JWT
 from cryptojwt.utils import b64e
 from fedservice.entity import get_verified_trust_chains
@@ -20,16 +19,15 @@ import urllib3
 import typer
 
 urllib3.disable_warnings()
-# Don't have time for a rewrite just now - lets keep app global for now
 
-def get_consumer(app,issuer):
+
+def get_consumer(app, issuer):
     actor = app["pid_eaa_consumer"]
     _consumer = None
     for iss in actor.issuers():
         if hash_func(iss) == issuer:
             _consumer = actor.get_consumer(iss)
             break
-
     return _consumer
 
 
@@ -53,8 +51,7 @@ def find_credential_issuers(app):
             continue
         if "openid_credential_issuer" in _metadata:
             res.append(entity_id)
-        print(f"Trawling beneath '{
-            entity_id}' looking for '{entity_type}'")
+        print(f"Trawling beneath '{entity_id}' looking for '{entity_type}'")
         _subs = app["federation_entity"].trawl(
             ta_id, entity_id, entity_type=entity_type
         )
@@ -65,14 +62,14 @@ def find_credential_issuers(app):
     return res
 
 
-def find_credential_type_issuers(app,credential_issuers, credential_type):
+def find_credential_type_issuers(app, credential_issuers, credential_type):
     _oci = {}
     # Other possibility = 'PDA1Credential'
     # credential_type = "EHICCredential"
     for pid in set(credential_issuers):
         oci_metadata = app["federation_entity"].get_verified_metadata(pid)
         # logger.info(json.dumps(oci_metadata, sort_keys=True, indent=4))
-        for id, cs in oci_metadata["openid_credential_issuer"][
+        for _, cs in oci_metadata["openid_credential_issuer"][
             "credential_configurations_supported"
         ].items():
             if credential_type in cs["credential_definition"]["type"]:
@@ -81,12 +78,12 @@ def find_credential_type_issuers(app,credential_issuers, credential_type):
     return _oci
 
 
-def find_issuers_of_trustmark(app,credential_issuers, credential_type):
+def find_issuers_of_trustmark(app, credential_issuers, credential_type):
     cred_issuer_to_use = []
     # tmi = {}
     trustmark_id = f"http://dc4eu.example.com/{credential_type}/se"
 
-    for eid, metadata in credential_issuers.items():
+    for eid, _ in credential_issuers.items():
         _trust_chain = app["federation_entity"].get_trust_chains(eid)[0]
         _entity_conf = _trust_chain.verified_chain[-1]
         if "trust_marks" in _entity_conf:
@@ -104,8 +101,7 @@ def find_issuers_of_trustmark(app,credential_issuers, credential_type):
     return cred_issuer_to_use
 
 
-def main(config:str):
-
+def main(config: str):
     ephemeral_key = None
 
     cnf = json.loads(open(config, "r").read())
@@ -142,7 +138,11 @@ def main(config:str):
     print("== Finding issuers in the federation through TrustMarks ==")
 
     msg = Message().from_dict(
-        {"collect_id": "collect_id_ehic_122", "authentic_source": "EHIC:00001", "document_type": "EHIC"}
+        {
+            "collect_id": "collect_id_ehic_122",
+            "authentic_source": "EHIC:00001",
+            "document_type": "EHIC",
+        }
     )
     credential_type = f"{msg['document_type']}Credential"
     # Remove so not part of issuer state
@@ -154,12 +154,12 @@ def main(config:str):
     print(f"Credential Issuers: {credential_issuers}")
 
     # Credential issuers that issue a specific credential type
-    _oci = find_credential_type_issuers(app,credential_issuers, credential_type)
+    _oci = find_credential_type_issuers(app, credential_issuers, credential_type)
     credential_type_issuers = set(list(_oci.keys()))
     print(f"{credential_type} Issuers: {credential_type_issuers}")
 
     # Credential issuer that has a specific trust mark
-    cred_issuer_to_use = find_issuers_of_trustmark(app,_oci, credential_type)
+    cred_issuer_to_use = find_issuers_of_trustmark(app, _oci, credential_type)
     print(f"Credential Issuer to use: {cred_issuer_to_use}")
 
     # Picking the first one
@@ -208,15 +208,16 @@ def main(config:str):
     }
 
     if "pushed_authorization" in actor.context.add_on:
-        _metadata = app["federation_entity"].get_verified_metadata(
-            actor.context.issuer)
+        _metadata = app["federation_entity"].get_verified_metadata(actor.context.issuer)
         if (
             "pushed_authorization_request_endpoint"
             in _metadata["oauth_authorization_server"]
         ):
-            kwargs["behaviour_args"]["pushed_authorization_request_endpoint"] = _metadata[
-                "oauth_authorization_server"
-            ]["pushed_authorization_request_endpoint"]
+            kwargs["behaviour_args"]["pushed_authorization_request_endpoint"] = (
+                _metadata["oauth_authorization_server"][
+                    "pushed_authorization_request_endpoint"
+                ]
+            )
 
     _wia_flow["state"] = kwargs["state"]
 
@@ -238,14 +239,13 @@ def main(config:str):
     form_payload = {}
     for input in form.find_all("input"):
         form_payload[input.get("name")] = input.get("value", "")
-    resp = session.post(form.get("action"), data=form_payload,
-                        allow_redirects=False)
+    resp = session.post(form.get("action"), data=form_payload, allow_redirects=False)
     assert resp.is_redirect
     url = resp.text
     issuer_string = urlparse(url).path.split("/authz_cb/")[1]
 
     print("== Getting token ==")
-    _consumer = get_consumer(app,issuer_string)
+    _consumer = get_consumer(app, issuer_string)
     _consumer.finalize_auth(dict(parse_qsl(urlparse(url).query)))
     response = urlparse(url).query
     print(response)
@@ -280,8 +280,7 @@ def main(config:str):
 
     # Just for display purposes
     _service = _consumer.get_service("accesstoken")
-    _metadata = app["federation_entity"].get_verified_metadata(
-        _consumer.context.issuer)
+    _metadata = app["federation_entity"].get_verified_metadata(_consumer.context.issuer)
     _args["endpoint"] = _metadata["oauth_authorization_server"]["token_endpoint"]
     req_info = _service.get_request_parameters(_request_args, **_args)
 
@@ -307,7 +306,8 @@ def main(config:str):
     _wia_flow = wallet_entity.context.wia_flow[ephemeral_key.kid]
 
     _req_args = _consumer.context.cstate.get_set(
-        _wia_flow["state"], claim=["access_token"])
+        _wia_flow["state"], claim=["access_token"]
+    )
 
     _request_args = {"format": "vc+sd-jwt"}
 
@@ -339,20 +339,28 @@ def main(config:str):
             to=f"https://{vc_instance}",
         )
 
-    print(f"{vc_instance} keys: {_consumer.keyjar.export_jwks_as_json(
-        issuer_id="https://{vc_instance}")}")
+    print(
+        f"{vc_instance} keys: {
+            _consumer.keyjar.export_jwks_as_json(issuer_id='https://{vc_instance}')
+        }"
+    )
 
     resp = _consumer.do_request(
         "credential",
         request_args=_request_args,
         access_token=_req_args["access_token"],
         state=_wia_flow["state"],
-        endpoint=trust_chain.metadata["openid_credential_issuer"]["credential_endpoint"],
+        endpoint=trust_chain.metadata["openid_credential_issuer"][
+            "credential_endpoint"
+        ],
     )
 
-    print(f"Signed JWT: {pprint.pp(resp['credentials'])} \n verified_claim: {
-          pprint.pp(resp[verified_claim_name('credential')])}")
-    # pdb.set_trace()
+    print(
+        f"Signed JWT: {pprint.pp(resp['credentials'])} \n verified_claim: {
+            pprint.pp(resp[verified_claim_name('credential')])
+        }"
+    )
+
 
 if __name__ == "__main__":
     typer.run(main)
