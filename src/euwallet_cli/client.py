@@ -20,7 +20,7 @@ from idpyoidc.key_import import import_jwks, store_under_other_id
 from idpyoidc.message import Message
 from idpyoidc.util import rndstr
 
-from utils import SaveLoadManager
+from euwallet_cli.utils import SaveLoadManager
 
 """
 In the code below:
