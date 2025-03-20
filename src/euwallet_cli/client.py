@@ -3,6 +3,7 @@
 
 import logging
 import pprint
+from typing import Optional
 from urllib.parse import parse_qsl, urlparse
 
 import requests
@@ -133,7 +134,12 @@ def find_issuers_of_trustmark(app, credential_issuers, credential_type):
     return cred_issuer_to_use
 
 
-def main(config_path: str):
+def main(
+    config_path: str,
+    msg: Optional[str] = typer.Option(None, help="Message as JSON string"),
+    issuer_to_use: Optional[str] = None,
+    document_type: Optional[str] = None,
+):
 
     print(config_path)
 
@@ -181,14 +187,16 @@ def main(config_path: str):
     print(f"{wallet_instance_attestation['assertion']}\n unpacked:{_ass}")
 
     print("== Finding issuers in the federation through TrustMarks ==")
-
-    msg = Message().from_dict(
-        {
-            "collect_id": "collect_id_ehic_122",
-            "authentic_source": "EHIC:00001",
-            "document_type": "EHIC",
-        }
-    )
+    if msg is None:
+        msg = Message().from_dict(
+            {
+                "collect_id": "collect_id_ehic_122",
+                "authentic_source": "EHIC:00001",
+                "document_type": "EHIC",
+            }
+        )
+    else:
+        msg = Message().from_dict(msg)
     credential_type = f"{msg['document_type']}Credential"
     # Remove so not part of issuer state
     del msg["document_type"]
@@ -208,7 +216,10 @@ def main(config_path: str):
     print(f"Credential Issuer to use: {cred_issuer_to_use}")
 
     # Picking the first one
-    cred_issuer_to_use = cred_issuer_to_use[0]
+    if issuer_to_use is None:
+        cred_issuer_to_use = cred_issuer_to_use[0]
+    else:
+        cred_issuer_to_use = issuer_to_use
 
     print("== Get authz for credential ==")
 
@@ -227,19 +238,34 @@ def main(config_path: str):
 
     _wia_flow = wallet_entity.context.wia_flow[ephemeral_key.kid]
 
-    request_args = {
-        "authorization_details": [
-            {
-                "type": "openid_credential",
-                "format": "vc+sd-jwt",
-                "vct": credential_type,
-            }
-        ],
-        "response_type": "code",
-        "client_id": ephemeral_key.kid,
-        "redirect_uri": _redirect_uri,
-        "issuer_state": issuer_state,
-    }
+    # raff implementation of devision for PID flow
+    if document_type:
+        request_args = {
+            "authorization_details": [
+                {
+                    "type": "openid_credential",
+                    "format": "vc+sd-jwt",
+                    "vct": document_type,
+                }
+            ],
+            "response_type": "code",
+            "client_id": ephemeral_key.kid,
+            "redirect_uri": _redirect_uri,
+        }
+    else:
+        request_args = {
+            "authorization_details": [
+                {
+                    "type": "openid_credential",
+                    "format": "vc+sd-jwt",
+                    "vct": credential_type,
+                }
+            ],
+            "response_type": "code",
+            "client_id": ephemeral_key.kid,
+            "redirect_uri": _redirect_uri,
+            "issuer_state": issuer_state,
+        }
 
     kwargs = {
         "state": rndstr(24),
