@@ -1,8 +1,16 @@
 ```mermaid
 sequenceDiagram
-Wallet->>Issuer: First step, what do I want?
-Note right of Issuer: Rational thoughts!
-Issuer->>Wallet: Great!
-Issuer->>openid-federation: How about you?
-openid-federation->>Wallet: Jolly good
+Wallet->>Issuer: .well-known/openid-credential-issue
+Issuer->>Wallet: Here are my metadata with oauth-credential-endpoint
+Wallet->>Issuer: HTTP POST PAR Request in header: PoP
+Issuer->>Wallet: PAR Response
+Wallet->>Issuer: Auth request Login/Password
+
+Issuer->>Wallet: AuthorizationResponse code
+Wallet->>Issuer: TokenRequest
+Issuer->>Wallet: TokenResponse access_token
+Wallet->>Issuer: CredentialRequest
+Issuer->>Wallet: CredentialResponse + credential 
+
+
 ```
