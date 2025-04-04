@@ -1,4 +1,13 @@
 #!/usr/bin/env python3
+"""
+sequenceDiagram
+Client (Wallet) ->> OP (/par): Send pushed authorization request
+OP ->> Session Store: Save request (authz_details, client, state, etc.)
+Client ->> OP (/authorize): Redirect with `request_uri` (or nothing)
+User ->> OP: Authenticates (SAML, Password, etc.)
+OP ->> Session Store: Store `authenticated: true`, grant, code
+OP ->> Client: Redirect with `code`
+"""
 
 
 import logging
@@ -50,6 +59,7 @@ logger = logging.getLogger(__name__)
 
 def get_consumer(app, issuer):
     actor = app["pid_eaa_consumer"]
+    help(actor)
     _consumer = None
     for iss in actor.issuers():
         if hash_func(iss) == issuer:
@@ -184,9 +194,9 @@ def main(config_path: str):
 
     msg = Message().from_dict(
         {
-            "collect_id": "collect_id_ehic_122",
-            "authentic_source": "EHIC:00001",
-            "document_type": "EHIC",
+            "collect_id": "collect_id_diploma_100",
+            "authentic_source": "EDU:DIPLOMA:000001",
+            "document_type": "Diploma",
         }
     )
     credential_type = f"{msg['document_type']}Credential"
@@ -208,7 +218,8 @@ def main(config_path: str):
     print(f"Credential Issuer to use: {cred_issuer_to_use}")
 
     # Picking the first one
-    cred_issuer_to_use = cred_issuer_to_use[0]
+    # cred_issuer_to_use = cred_issuer_to_use[0]
+    cred_issuer_to_use = "https://satosa-dev-1.sunet.se"
 
     print("== Get authz for credential ==")
 
@@ -222,11 +233,16 @@ def main(config_path: str):
     wallet_entity = app["wallet"]
 
     b64hash = hash_func(cred_issuer_to_use)
+
     _redirect_uri = f"{parent.entity_id}/authz_cb/{b64hash}"
+
     print(_redirect_uri)
 
     _wia_flow = wallet_entity.context.wia_flow[ephemeral_key.kid]
+    print(ephemeral_key)
+    import pdb
 
+    pdb.set_trace()
     request_args = {
         "authorization_details": [
             {
@@ -250,7 +266,7 @@ def main(config_path: str):
             "client_assertion": _wia_flow["wallet_instance_attestation"]["assertion"],
         },
     }
-
+    ##'https://satosa-dev-1.sunet.se/par'
     if "pushed_authorization" in actor.context.add_on:
         _metadata = app["federation_entity"].get_verified_metadata(actor.context.issuer)
         if (
@@ -262,40 +278,136 @@ def main(config_path: str):
                     "pushed_authorization_request_endpoint"
                 ]
             )
+    import pdb
+
+    pdb.set_trace()
 
     _wia_flow["state"] = kwargs["state"]
 
     _service = actor.get_service("authorization")
+    """
+    <openid4v.client.pid_eaa.Authorization object at 0x1041b2f90>
+
+    here store happens on par 
+    https://github.com/SUNET/openid4v/blob/34df6dc469b04a75a30d7abf6eb8b7861379c683/src/openid4v/client/pid_eaa.py#L103
+    def get_state_parameter(request_args, kwargs):
+    """Find a state value from a set of possible places."""
+    try:
+        _state = kwargs["state"]
+    except KeyError:
+        try:
+            _state = request_args["state"]
+        except KeyError:
+            raise MissingParameter("state")
+
+    return _state
+    """
 
     _service.certificate_issuer_id = cred_issuer_to_use
 
+    """
+    in the request below: averything regarding par and returns the request with uri 
+    req_info
+    {'method': 'GET', 'request': <idpyoidc.message.oauth2.JWTSecuredAuthorizationRequest 
+    object at 0x105d3d160>, 
+    'url': 'https://satosa-dev-1.sunet.se/authorization?request_uri=urn%3Auuid%3A538148bd-2d5f-4df5-adc2-d1ed23f8334e&response_type=code&client_id=dlZraWR3bnJaSTZSQk5YT0QxZXFjWUxEVHljZjhfcDhZWEJkSW51OGVPWQ'}
+    request_uri=urn%3Auuid%3A538148bd-2d5f-4df5-adc2-d1ed23f8334e   ---- should be on the server 
+    https://github.com/SUNET/openid4v/blob/34df6dc469b04a75a30d7abf6eb8b7861379c683/src/openid4v/client/pid_eaa.py#L40
+
+    Authorization->Fedservice->Service 
+    get_request_parameters
+
+
+    
+    https://github.com/IdentityPython/idpy-oidc/blob/fd283e2573a14ac3e57944118914418719ff070e/src/idpyoidc/client/service.py#L414
+    
+    """
+    
+    
     req_info = _service.get_request_parameters(request_args, **kwargs)
+    """
+    the metadata is received from trust chains
+
+    https://github.com/SUNET/openid4v/blob/34df6dc469b04a75a30d7abf6eb8b7861379c683/src/openid4v/client/pid_eaa.py#L40
+
+   ### the class inherits from the fed service
+    class Authorization(FederationService):
+    The service that talks to the Certificate issuer
+
+    msg_type = AuthorizationRequest
+    response_cls = AuthorizationResponse
+    error_msg = ResponseMessage
+    synchronous = True
+    service_name = "authorization"
+    http_method = "GET"
+    # default_authn_method = "openid4v.client.client_authn.ClientAuthenticationAttestation"
+
+    _supports = {
+        "claims_parameter_supported": True,
+        "request_parameter_supported": True,
+        "request_uri_parameter_supported": True,
+        "response_types_supported": ["code"],
+        "response_modes_supported": ["query"],
+        "request_object_signing_alg_values_supported": alg_info.get_signing_algs,
+        "request_object_encryption_alg_values_supported": [],
+        "request_object_encryption_enc_values_supported": [],
+        # "grant_types_supported": ["authorization_code", "implicit"],
+        "code_challenge_methods_supported": ["S256"],
+        "scopes_supported": [],
+    }
+
+    """
+    """
+    example response:
+    {'method': 'GET', 'request': <idpyoidc.message.oauth2.JWTSecuredAuthorizationRequest object at 0x105d3d160>, 'url': 'https://satosa-dev-1.sunet.se/authorization?request_uri=urn%3Auuid%3A538148bd-2d5f-4df5-adc2-d1ed23f8334e&response_type=code&client_id=dlZraWR3bnJaSTZSQk5YT0QxZXFjWUxEVHljZjhfcDhZWEJkSW51OGVPWQ'}
+    """
+
+    print(ephemeral_key.serialize())
+
+    print(dict(req_info))
 
     print("== Following SAML2 flow ==")
 
     print(f"Redirect to: {req_info['url']}")
+
     session = requests.session()
+
     resp = session.get(req_info["url"])
+
+    import pdb
+
+    pdb.set_trace()
+
     form = BeautifulSoup(resp.content, features="html.parser").find_all("form")[1]
+
     form_payload = {}
 
     for input in form.find_all("input"):
-        form_payload[input.get("name")] = "theron"
+        form_payload[input.get("name")] = "mirren"
     resp = session.post(form.get("action"), data=form_payload)
     form = BeautifulSoup(resp.content, features="html.parser").find("form")
     form_payload = {}
 
     for input in form.find_all("input"):
         form_payload[input.get("name")] = input.get("value", "")
+
     resp = session.post(form.get("action"), data=form_payload, allow_redirects=False)
+
     assert resp.is_redirect
+
     url = resp.text
+
     issuer_string = urlparse(url).path.split("/authz_cb/")[1]
 
     print("== Getting token ==")
     _consumer = get_consumer(app, issuer_string)
+
+    help(_consumer)
+
     _consumer.finalize_auth(dict(parse_qsl(urlparse(url).query)))
+
     response = urlparse(url).query
+
     print(response)
 
     _wia_flow = app["wallet"].context.wia_flow[ephemeral_key.kid]
@@ -358,7 +470,9 @@ def main(config_path: str):
         _wia_flow["state"], claim=["access_token"]
     )
 
-    _request_args = {"format": "vc+sd-jwt"}
+    _request_args = {
+        "format": "vc+sd-jwt",
+    }
 
     _service = _consumer.get_service("credential")
     req_info = _service.get_request_parameters(
@@ -392,7 +506,65 @@ def main(config_path: str):
         f"{vc_instance} keys: {_consumer.keyjar.export_jwks_as_json(issuer_id="https://{vc_instance}")}"
     )
 
-    resp = _consumer.do_request(
+    print(f"HERE is the KEY:{ephemeral_key}")
+    print(trust_chain.metadata["openid_credential_issuer"])
+    help(_consumer)
+    """
+    Help on StandAloneClient in module idpyoidc.client.oauth2.stand_alone_client object:
+
+class StandAloneClient(idpyoidc.client.oauth2.Client)
+ |  StandAloneClient(
+ |      keyjar: Optional[cryptojwt.key_jar.KeyJar] = None,
+ |      config: Union[dict, idpyoidc.configure.Configuration, NoneType] = None,
+ |      services: Optional[dict] = None,
+ |      httpc: Optional[Callable] = None,
+ |      httpc_params: Optional[dict] = None,
+ |      context: Optional[idpyoidc.context.OidcContext] = None,
+ |      upstream_get: Optional[Callable] = None,
+ |      key_conf: Optional[dict] = None,
+ |      entity_id: Optional[str] = '',
+ |      verify_ssl: Optional[bool] = True,
+ |      jwks_uri: Optional[str] = '',
+ |      client_type: Optional[str] = '',
+ |      **kwargs
+ |  )
+ |
+ |  Method resolution order:
+ |      StandAloneClient
+ |      idpyoidc.client.oauth2.Client
+ |      idpyoidc.client.entity.Entity
+ |      idpyoidc.node.Unit
+ |      idpyoidc.impexp.ImpExp
+ |      builtins.object
+
+ |  do_request(
+ |      self,
+ |      request_type: str,
+ |      response_body_type: Optional[str] = '',
+ |      request_args: Optional[dict] = None,
+ |      behaviour_args: Optional[dict] = None,
+ |      **kwargs
+ |  )
+    """
+    import pdb
+    import traceback
+
+    def debug_do_request(*args, **kwargs):
+        print("ARGS:", args)
+        print("KWARGS:", kwargs)
+        pdb.set_trace()
+        resp = _consumer.do_request(*args, **kwargs)
+        print("RESPONSE:", resp)
+        return resp
+
+
+    """
+    how greek wallet does this? how should they send the; 
+    do they construct the response the same way;
+    https://github.com/SUNET/openid4v/blob/34df6dc469b04a75a30d7abf6eb8b7861379c683/src/openid4v/client/pid_eaa.py#L274
+
+    """
+    resp = debug_do_request(
         "credential",
         request_args=_request_args,
         access_token=_req_args["access_token"],
@@ -400,6 +572,7 @@ def main(config_path: str):
         endpoint=trust_chain.metadata["openid_credential_issuer"][
             "credential_endpoint"
         ],
+        key=ephemeral_key,
     )
 
     print(
