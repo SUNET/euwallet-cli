@@ -2,7 +2,9 @@
     . ./venv/bin/activate
     pip3 install .
     cd src/euwallet_cli
-    ./client.py <client.conf> (e.g client-test.conf)
+1) ./client.py <client.conf> (e.g client-test.conf)
+
+2) ./client_rework.py <client.conf> (e.g client-test.conf) ehic
 
 
 

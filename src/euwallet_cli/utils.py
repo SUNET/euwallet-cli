@@ -18,6 +18,14 @@ class SaveLoadManager:
     """
 
     @staticmethod
+    def select_credential_type(credential_messages: dict, credential_type: str) -> Union[Dict]:
+        try:
+            cred_message = credential_messages[credential_type]
+            return cred_message
+        except Exception as e:
+            raise e
+
+    @staticmethod
     def load_config(config_path: str) -> Union[Dict]:
         """
         Load configuration file

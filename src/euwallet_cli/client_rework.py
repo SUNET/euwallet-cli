@@ -133,14 +133,18 @@ def find_issuers_of_trustmark(app, credential_issuers, credential_type):
     return cred_issuer_to_use
 
 
-def main(config_path: str):
-
-    print(config_path)
+def main(config_path: str, credential_type: str):
 
     ephemeral_key = None
 
     cnf = SaveLoadManager.load_config(config_path)
 
+    # TODO:make more general function for loading
+    credential_messages = SaveLoadManager.load_config("credential_message.json")
+
+    cred_message = SaveLoadManager.select_credential_type(
+        credential_messages, credential_type
+    )
     wallet_provider = cnf["wallet_provider"]
 
     app = make_federation_combo(**cnf["entity"])
@@ -182,30 +186,8 @@ def main(config_path: str):
 
     print("== Finding issuers in the federation through TrustMarks ==")
 
-    msg = Message().from_dict(
-        {
-            "collect_id": "collect_id_ehic_100",
-            "authentic_source": "EHIC:00001",
-            "document_type": "EHIC",
-        }
-    )
-
-    # msg = Message().from_dict(
-    #     {
-    #         "collect_id": "collect_id_pda1_100",
-    #         "authentic_source": "PDA1:00001",
-    #         "document_type": "PDA1",
-    #     }
-    # )
-
-    # msg = Message().from_dict(
-    #     {
-    #         "collect_id": "collect_id_pid_100",
-    #         "authentic_source": "PID:00001",
-    #         "document_type": "PID",
-    #     }
-    # )
-    credential_type = f"{msg['document_type']}Credential"
+    msg = Message().from_dict(cred_message["message"])
+    credential_type = cred_message["credential_type"]
     # Remove so not part of issuer state
     del msg["document_type"]
 
@@ -214,17 +196,20 @@ def main(config_path: str):
     credential_issuers = find_credential_issuers(app)
     print(f"Credential Issuers: {credential_issuers}")
 
+    trust_mark_type = cred_message["trust_mark_type"]
+
     # Credential issuers that issue a specific credential type
-    _oci = find_credential_type_issuers(app, credential_issuers, credential_type)
+    _oci = find_credential_type_issuers(app, credential_issuers, trust_mark_type)
     credential_type_issuers = set(list(_oci.keys()))
     print(f"{credential_type} Issuers: {credential_type_issuers}")
 
     # Credential issuer that has a specific trust mark
-    cred_issuer_to_use = find_issuers_of_trustmark(app, _oci, credential_type)
+    cred_issuer_to_use = find_issuers_of_trustmark(app, _oci, trust_mark_type)
     print(f"Credential Issuer to use: {cred_issuer_to_use}")
 
     # Picking the first one
     cred_issuer_to_use = cred_issuer_to_use[0]
+    # cred_issuer_to_use = "https://satosa-test-1.sunet.se"
 
     print("== Get authz for credential ==")
 
