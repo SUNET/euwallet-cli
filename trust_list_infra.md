@@ -1,0 +1,32 @@
+## Trust List place in the Infrastructure, overviview:
+
+Document for the reference:
+https://github.com/EWC-consortium/eudi-wallet-rfcs/blob/main/ewc-rfc012-trust-mechanism.md#433-relying-parties
+
+
+```mermaid
+flowchart TD
+    Issuer["Issuer"] -- Issues Credential --> Credential["Verifiable Credential"]
+    Credential -- Stored in --> Wallet["Wallet Unit"]
+    Wallet -- Presents Credential --> Verifier["Relying Party / Verifier"]
+    Credential -- Includes --> Key["Public Key / Certificate"]
+    Key -- Anchored in --> TL["Trusted List (EWC TL)"]
+    Verifier -- Verifies Issuer & Credential --> TL
+    Wallet -- Verifies Issuer & Credential --> TL
+    Wallet -- Verifies Verifier(Feedback to the User - 4.3.2.2 Sharing credentials) --> TL
+    Verifier -- Verifies Wallet Unit Attestation --> TL
+    TL -. Must Register .-> Issuer & WalletProvider["Wallet Provider"]
+    TL -. "Recommended to be Registered (Feedback to the User) - 4.3.2.2 Sharing credentials" .-> Verifier
+
+     Issuer:::actor
+     Credential:::doc
+     Wallet:::actor
+     Verifier:::actor
+     Key:::key
+     TL:::trustlist
+    classDef trustlist fill:#fdf6b2,stroke:#d97706,color:#92400e
+    classDef actor fill:#f0f9ff,stroke:#0284c7,color:#0c4a6e
+    classDef doc fill:#f3f4f6,stroke:#6b7280,color:#374151
+    classDef key fill:#ecfccb,stroke:#65a30d,color:#365314
+    linkStyle 1 stroke:#000000
+```
