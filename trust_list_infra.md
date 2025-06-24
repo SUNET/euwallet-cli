@@ -3,6 +3,8 @@
 Document for the reference:
 https://github.com/EWC-consortium/eudi-wallet-rfcs/blob/main/ewc-rfc012-trust-mechanism.md#433-relying-parties
 
+
+```mermaid
 flowchart TD
     Issuer["Issuer"] -- Issues Credential --> Credential["Verifiable Credential"]
     Credential -- Stored in --> Wallet["Wallet Unit"]
@@ -27,3 +29,4 @@ flowchart TD
     classDef doc fill:#f3f4f6,stroke:#6b7280,color:#374151
     classDef key fill:#ecfccb,stroke:#65a30d,color:#365314
     linkStyle 1 stroke:#000000
+```
