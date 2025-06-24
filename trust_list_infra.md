@@ -13,10 +13,10 @@ flowchart TD
     Key -- Anchored in --> TL["Trusted List (EWC TL)"]
     Verifier -- Verifies Issuer & Credential --> TL
     Wallet -- Verifies Issuer & Credential --> TL
-    Wallet -- Verifies Verifier --> TL
+    Wallet -- Verifies Verifier(Feedback to the User - 4.3.2.2 Sharing credentials) --> TL
     Verifier -- Verifies Wallet Unit Attestation --> TL
     TL -. Must Register .-> Issuer & WalletProvider["Wallet Provider"]
-    TL -. "Recommended to be Registered - Section 4.3.3" .-> Verifier
+    TL -. "Recommended to be Registered (Feedback to the User) - 4.3.2.2 Sharing credentials" .-> Verifier
 
      Issuer:::actor
      Credential:::doc
